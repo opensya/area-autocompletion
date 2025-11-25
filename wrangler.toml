@@ -1,3 +1,0 @@
-name = "worker-name"
-main = "dist/index.js"
-compatibility_date = "2025-11-25"

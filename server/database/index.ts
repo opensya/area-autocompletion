@@ -1,7 +1,7 @@
-import { MongoClient, Db } from "mongodb";
+import { MongoClient } from "mongodb";
 
-const MONGO_URI = process.env.MONGO_URI;
-const DB_NAME = process.env.DB_NAME;
+const MONGO_URI = process.env.MONGO_URI!;
+const DB_NAME = process.env.DB_NAME!;
 
 /**
  * Initialise la connexion MongoDB si ce n'est pas déjà fait.
