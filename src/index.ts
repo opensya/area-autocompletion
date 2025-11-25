@@ -1,26 +1,53 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import "dotenv/config";
 
-export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		const url = new URL(request.url);
-		switch (url.pathname) {
-			case '/message':
-				return new Response('Hello, World!');
-			case '/random':
-				return new Response(crypto.randomUUID());
-			default:
-				return new Response('Not Found', { status: 404 });
-		}
-	},
-} satisfies ExportedHandler<Env>;
+import Koa from "koa";
+import Router from "koa-router";
+
+import { getDatabase } from "./db_client";
+import { AreaData } from "./types";
+
+async function bootstrap() {
+  const app = new Koa();
+  const router = new Router();
+
+  router.get("/", async (ctx) => {
+    const { db, client } = await getDatabase();
+    const collection = db.collection<AreaData>("area_data");
+    const query = ctx.query.query as string;
+
+    const results = await collection
+      .aggregate([
+        {
+          $match: { name: { $regex: query, $options: "i" } },
+        },
+        {
+          $lookup: {
+            from: "area_data",
+            localField: "parent",
+            foreignField: "code",
+            as: "parent_doc", // résultat mis dans ce tableau
+          },
+        },
+        {
+          $addFields: {
+            _parent: { $arrayElemAt: ["$parent_doc", 0] }, // récupérer un seul parent
+          },
+        },
+        { $project: { parent_doc: 0 } }, // supprimer le tableau temporaire
+      ])
+      .toArray();
+
+    ctx.body = results;
+  });
+
+  app.use(router.routes());
+  app.use(router.allowedMethods());
+
+  // Lancer le serveur
+  const PORT = 3000;
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+bootstrap();
